@@ -404,7 +404,7 @@ nav {
     height: 18px;
 }
 
-.url-input-container button img:hover{
+.url-input-container button img:hover {
     transform: scale(1.1);
 }
 
@@ -413,6 +413,114 @@ nav {
     display: flex;
     flex-direction: column;
     align-items: center;
+}
+
+.file-name-display {
+    font-family: var(--font-Onest);
+    font-size: 14px;
+    color: #333;
+    margin-top: 10px;
+    font-weight: 600;
+    display: none;
+}
+
+/* Loader */
+.spinner {
+    font-size: 28px;
+    position: relative;
+    display: inline-block;
+    width: 1em;
+    height: 1em;
+}
+
+.spinner.center {
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    transform: translate(-50%, -50%);
+    display: none;
+}
+
+.spinner .spinner-blade {
+    position: absolute;
+    left: 0.4629em;
+    bottom: 0;
+    width: 0.074em;
+    height: 0.2777em;
+    border-radius: 0.0555em;
+    background-color: transparent;
+    transform-origin: center -0.2222em;
+    animation: spinner-fade 1s infinite linear;
+}
+
+.spinner .spinner-blade:nth-child(1) {
+    animation-delay: 0s;
+    transform: rotate(0deg);
+}
+
+.spinner .spinner-blade:nth-child(2) {
+    animation-delay: 0.083s;
+    transform: rotate(30deg);
+}
+
+.spinner .spinner-blade:nth-child(3) {
+    animation-delay: 0.166s;
+    transform: rotate(60deg);
+}
+
+.spinner .spinner-blade:nth-child(4) {
+    animation-delay: 0.249s;
+    transform: rotate(90deg);
+}
+
+.spinner .spinner-blade:nth-child(5) {
+    animation-delay: 0.332s;
+    transform: rotate(120deg);
+}
+
+.spinner .spinner-blade:nth-child(6) {
+    animation-delay: 0.415s;
+    transform: rotate(150deg);
+}
+
+.spinner .spinner-blade:nth-child(7) {
+    animation-delay: 0.498s;
+    transform: rotate(180deg);
+}
+
+.spinner .spinner-blade:nth-child(8) {
+    animation-delay: 0.581s;
+    transform: rotate(210deg);
+}
+
+.spinner .spinner-blade:nth-child(9) {
+    animation-delay: 0.664s;
+    transform: rotate(240deg);
+}
+
+.spinner .spinner-blade:nth-child(10) {
+    animation-delay: 0.747s;
+    transform: rotate(270deg);
+}
+
+.spinner .spinner-blade:nth-child(11) {
+    animation-delay: 0.83s;
+    transform: rotate(300deg);
+}
+
+.spinner .spinner-blade:nth-child(12) {
+    animation-delay: 0.913s;
+    transform: rotate(330deg);
+}
+
+@keyframes spinner-fade {
+    0% {
+        background-color: #7150e6;
+    }
+
+    100% {
+        background-color: white;
+    }
 }
 
 /* Default Styles (Mobile First Approach) */
@@ -1453,4 +1561,85 @@ footer {
     .social-icons a img {
         width: 30px;
     }
+}
+
+/* Notification Component */
+.notification {
+    font-family: var(--font-Onest);
+    position: fixed;
+    top: -100px;
+    left: 0;
+    right: 0;
+    z-index: 9999;
+    display: flex;
+    justify-content: center;
+    transition: top 0.5s ease, opacity 0.5s ease;
+    opacity: 0;
+}
+
+.notification.show {
+    top: 0;
+    opacity: 1;
+}
+
+.notification.fade-out {
+    opacity: 0;
+}
+
+.notification-content {
+    background-color: #f44336;
+    color: white;
+    padding: 16px;
+    border-radius: 10px;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+    margin: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    max-width: 600px;
+    width: 100%;
+    transform: translateY(0);
+    transition: transform 0.3s ease;
+}
+
+.notification-icon-message {
+    display: flex;
+    align-items: center;
+}
+
+.notification-icon {
+    margin-right: 10px;
+    flex-shrink: 0;
+}
+
+.notification.show .notification-content {
+    animation: notification-bounce 0.5s ease;
+}
+
+@keyframes notification-bounce {
+    0% { transform: translateY(-20px); }
+    50% { transform: translateY(10px); }
+    100% { transform: translateY(0); }
+}
+
+.notification-close {
+    background: none;
+    border: none;
+    color: white;
+    font-size: 24px;
+    cursor: pointer;
+    margin-left: 15px;
+    padding: 0 5px;
+}
+
+.notification-close:hover {
+    color: #ddd;
+}
+
+/* Error Message in Upload Box */
+.error-message {
+    color: #f44336;
+    margin-top: 10px;
+    display: none;
+    font-size: 14px;
 }

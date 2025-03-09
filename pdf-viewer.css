@@ -1,0 +1,904 @@
+/* PDF Viewer and Chat Interface Styles */
+:root {
+    --pdf-primary: #776CFF;
+    --pdf-secondary: #6258e6;
+    --pdf-accent: #4895ef;
+    --pdf-gradient: linear-gradient(135deg, var(--pdf-primary) 0%, var(--pdf-secondary) 100%);
+    --pdf-bg: #ffffff;
+    --pdf-text: #333333;
+    --pdf-border: #e9ecef;
+    --pdf-toolbar: #f8f9fa;
+    --pdf-highlight: rgba(119, 108, 255, 0.3);
+    --chat-bg: #ffffff;
+    --chat-user-bg: #776CFF;
+    --chat-ai-bg: #f0f0f0;
+    --chat-input-bg: #ffffff;
+    --transition-speed: 0.2s;
+    --box-shadow: none;
+    --hover-shadow: none;
+    --font-Onest: 'Onest', sans-serif;
+}
+
+[data-theme="dark"] {
+    --pdf-primary: #776CFF;
+    --pdf-secondary: #6258e6;
+    --pdf-bg: #1a1a1a;
+    --pdf-text: #f0f0f0;
+    --pdf-border: #3a3a3a;
+    --pdf-toolbar: #2a2a2a;
+    --pdf-highlight: rgba(119, 108, 255, 0.4);
+    --chat-bg: #1a1a1a;
+    --chat-user-bg: #776CFF;
+    --chat-ai-bg: #2a2a2a;
+    --chat-input-bg: #2a2a2a;
+    --box-shadow: none;
+    --hover-shadow: none;
+}
+
+body {
+    margin: 0;
+    padding: 0;
+    font-family: 'Onest', sans-serif;
+    background-color: #f5f5f5;
+    color: var(--pdf-text);
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+/* Navbar Styles */
+.pdf-viewer-nav {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 10px 20px;
+    background-color: white;
+    border-bottom: 1px solid var(--pdf-border);
+    position: relative;
+    z-index: 10;
+}
+
+.pdf-info {
+    display: flex;
+    align-items: center;
+    margin-right: auto;
+    font-family: 'Onest', sans-serif;
+    color: #333;
+    max-width: 50%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.pdf-info h1 {
+    margin: 0;
+    font-size: 16px;
+    font-weight: 600;
+    color: #333;
+    font-family: 'Onest', sans-serif;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* Main Container */
+.pdf-chat-container {
+    display: flex;
+    padding: 0;
+    height: calc(100vh - 60px);
+    width: 100%;
+    margin: 0;
+    gap: 0;
+    background-color: white;
+    position: relative;
+}
+
+/* Resizer */
+.resizer {
+    width: 8px;
+    height: 100%;
+    background-color: #e9ecef;
+    cursor: col-resize;
+    position: absolute;
+    left: 60%;
+    top: 0;
+    z-index: 10;
+    transition: background-color 0.2s;
+}
+
+.resizer:hover, .resizer.active {
+    background-color: #776CFF;
+}
+
+/* PDF Viewer Section */
+.pdf-viewer-section {
+    width: 60%;
+    display: flex;
+    flex-direction: column;
+    background-color: white;
+    border-radius: 0;
+    overflow: hidden;
+    position: relative;
+    max-height: calc(100vh - 60px);
+}
+
+.pdf-toolbar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 10px 15px;
+    background-color: #f8f9fa;
+    border-bottom: 1px solid #e9ecef;
+    border-radius: 0;
+    margin-bottom: 0;
+    flex-wrap: nowrap;
+}
+
+.pdf-controls, .pdf-zoom-controls, .pdf-search, .pdf-actions {
+    display: flex;
+    align-items: center;
+    margin-left: 10px;
+    gap: 5px;
+}
+
+.pdf-controls:hover, .pdf-zoom-controls:hover, .pdf-search:hover, .pdf-actions:hover {
+    background-color: rgba(119, 108, 255, 0.1);
+}
+
+/* Tooltip for options */
+.pdf-control-btn {
+    background: transparent;
+    border: none;
+    border-radius: 50%;
+    width: 36px;
+    height: 36px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    position: relative;
+    transition: background-color 0.2s ease;
+    color: #555;
+    overflow: visible;
+}
+
+.pdf-control-btn:hover {
+    background-color: rgba(119, 108, 255, 0.1);
+    color: #776CFF;
+}
+
+.pdf-control-btn svg {
+    width: 20px;
+    height: 20px;
+    transition: transform 0.2s ease;
+}
+
+.pdf-control-btn:hover svg {
+    transform: scale(1.1);
+    color: #776CFF;
+}
+
+.page-info {
+    display: flex;
+    align-items: center;
+    font-family: 'Onest', sans-serif;
+    font-size: 14px;
+    color: #555;
+    margin: 0 10px;
+    white-space: nowrap;
+}
+
+#current-page, #total-pages {
+    font-weight: 600;
+}
+
+.pdf-search {
+    position: relative;
+}
+
+.pdf-search input {
+    width: 180px;
+    padding: 6px 12px;
+    border: 1px solid #ddd;
+    border-radius: 20px;
+    font-family: 'Onest', sans-serif;
+    font-size: 14px;
+    outline: none;
+    transition: border-color 0.2s ease;
+}
+
+.pdf-search input:focus {
+    border-color: #776CFF;
+}
+
+#zoom-level {
+    font-family: 'Onest', sans-serif;
+    font-size: 14px;
+    color: #555;
+    min-width: 45px;
+    text-align: center;
+}
+
+/* PDF Container */
+.pdf-container {
+    flex: 1;
+    overflow: auto;
+    padding: 20px;
+    background-color: white;
+    display: flex;
+    justify-content: center;
+    align-items: flex-start;
+    border-radius: 0;
+    height: calc(100% - 60px); /* Adjust for toolbar height */
+    scrollbar-width: auto; /* For Firefox */
+    scrollbar-color: rgba(119, 108, 255, 0.6) rgba(0, 0, 0, 0.1); /* For Firefox */
+}
+
+/* Scrollbar styles */
+.pdf-container::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+    display: block;
+}
+
+.pdf-container::-webkit-scrollbar-track {
+    background: rgba(0, 0, 0, 0.1);
+    border-radius: 5px;
+}
+
+.pdf-container::-webkit-scrollbar-thumb {
+    background: rgba(119, 108, 255, 0.6);
+    border-radius: 5px;
+}
+
+.pdf-container::-webkit-scrollbar-thumb:hover {
+    background: rgba(119, 108, 255, 0.8);
+}
+
+#pdf-canvas {
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+    border-radius: 5px;
+    transition: transform 0.2s ease;
+    background-color: white;
+    margin: 0 auto;
+    display: block;
+    max-width: 100%;
+    max-height: 100%;
+    object-fit: contain;
+    user-select: text !important;
+    -webkit-user-select: text !important;
+    -moz-user-select: text !important;
+    -ms-user-select: text !important;
+}
+
+/* Text layer for selection and search */
+.textLayer {
+    position: absolute;
+    left: 0;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    overflow: hidden;
+    opacity: 0.2;
+    line-height: 1.0;
+    pointer-events: auto;
+    mix-blend-mode: multiply;
+    z-index: 2;
+}
+
+.textLayer > span {
+    color: transparent;
+    position: absolute;
+    white-space: pre;
+    cursor: text;
+    transform-origin: 0% 0%;
+    user-select: text;
+    -webkit-user-select: text;
+    -moz-user-select: text;
+    -ms-user-select: text;
+}
+
+.textLayer .highlight {
+    margin: -1px;
+    padding: 1px;
+    background-color: var(--pdf-highlight);
+    border-radius: 4px;
+    opacity: 1;
+}
+
+.textLayer .highlight.selected {
+    background-color: rgba(255, 255, 0, 0.5);
+    opacity: 1;
+}
+
+.textLayer ::selection {
+    background: rgba(119, 108, 255, 0.3);
+}
+
+/* Chat Section */
+.chat-section {
+    width: 40%;
+    display: flex;
+    flex-direction: column;
+    background-color: white;
+    border-radius: 0;
+    overflow: hidden;
+    margin-left: 0;
+    position: relative;
+    border-left: 1px solid #e9ecef;
+    max-height: calc(100vh - 60px);
+}
+
+.chat-section::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: radial-gradient(circle at 30% 30%, rgba(119, 108, 255, 0.05) 0%, transparent 70%);
+    z-index: 0;
+}
+
+.chat-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 15px;
+    border-bottom: 1px solid #e9ecef;
+    background-color: #f8f9fa;
+    border-radius: 0;
+}
+
+.chat-actions {
+    display: flex;
+    gap: 10px;
+    margin-left: auto;
+}
+
+.chat-action-btn {
+    background: transparent;
+    border: none;
+    border-radius: 50%;
+    width: 36px;
+    height: 36px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    position: relative;
+    transition: background-color 0.2s ease;
+    color: #555;
+    overflow: visible;
+}
+
+.chat-action-btn:hover {
+    background-color: rgba(119, 108, 255, 0.1);
+    color: #776CFF;
+}
+
+.chat-action-btn svg {
+    width: 20px;
+    height: 20px;
+    transition: transform 0.2s ease;
+}
+
+.chat-action-btn:hover svg {
+    transform: scale(1.1);
+    color: #776CFF;
+}
+
+/* Chat Messages */
+.chat-messages {
+    flex: 1;
+    overflow-y: auto;
+    padding: 15px;
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+    background-color: white;
+    height: calc(100% - 120px); /* Adjust for header and input container */
+}
+
+/* Scrollbar styles for chat messages */
+.chat-messages::-webkit-scrollbar {
+    width: 10px;
+}
+
+.chat-messages::-webkit-scrollbar-track {
+    background: #f1f1f1;
+}
+
+.chat-messages::-webkit-scrollbar-thumb {
+    background: #c1c1c1;
+    border-radius: 5px;
+}
+
+.chat-messages::-webkit-scrollbar-thumb:hover {
+    background: #a1a1a1;
+}
+
+.message {
+    max-width: 85%;
+    padding: 10px 15px;
+    border-radius: 18px;
+    position: relative;
+    transition: transform 0.2s ease;
+}
+
+.message:hover {
+    transform: translateY(-2px);
+}
+
+.user-message {
+    align-self: flex-end;
+    background-color: #776CFF;
+    color: white;
+    border-bottom-right-radius: 5px;
+}
+
+.ai-message {
+    align-self: flex-start;
+    background-color: #f0f0f0;
+    color: #333;
+    border-bottom-left-radius: 5px;
+}
+
+.system-message {
+    align-self: center;
+    background-color: rgba(119, 108, 255, 0.1);
+    color: #555;
+    border-radius: 10px;
+    max-width: 90%;
+    text-align: center;
+}
+
+.system-message:hover {
+    transform: none;
+}
+
+.message-content {
+    position: relative;
+    z-index: 1;
+}
+
+.message-content p {
+    margin: 0;
+}
+
+.message-content p:last-child {
+    margin-bottom: 0;
+}
+
+.typing-indicator {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 5px;
+}
+
+.typing-dot {
+    width: 8px;
+    height: 8px;
+    background-color: #aaa;
+    border-radius: 50%;
+    animation: typingAnimation 1s infinite;
+}
+
+.typing-dot:nth-child(1) { animation-delay: 0s; }
+.typing-dot:nth-child(2) { animation-delay: 0.2s; }
+.typing-dot:nth-child(3) { animation-delay: 0.4s; }
+
+@keyframes typingAnimation {
+    0%, 100% { opacity: 0.3; }
+    50% { opacity: 1; }
+}
+
+/* Chat input container */
+.chat-input-container {
+    display: flex;
+    align-items: center;
+    padding: 15px;
+    background-color: white;
+    border-top: 1px solid #e9ecef;
+}
+
+#chat-input {
+    flex: 1;
+    border: 1px solid #ddd;
+    border-radius: 20px;
+    padding: 10px 15px;
+    font-family: 'Onest', sans-serif;
+    font-size: 14px;
+    resize: none;
+    max-height: 120px;
+    min-height: 40px;
+    outline: none;
+    transition: border-color 0.2s ease;
+    margin-right: 10px;
+    overflow-y: auto;
+}
+
+#chat-input:focus {
+    border-color: #776CFF;
+}
+
+.send-btn {
+    background-color: #776CFF;
+    border: none;
+    border-radius: 50%;
+    width: 40px;
+    height: 40px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: background-color 0.2s ease;
+    position: relative;
+    overflow: hidden;
+}
+
+.send-btn:hover {
+    background-color: #6258e6;
+}
+
+.send-btn svg {
+    width: 20px;
+    height: 20px;
+    fill: white;
+    transition: transform 0.2s ease;
+}
+
+.send-btn:hover svg {
+    transform: scale(1.1);
+}
+
+/* Highlight styles */
+.highlight {
+    background-color: rgba(119, 108, 255, 0.3);
+    border-radius: 2px;
+    padding: 0 2px;
+    transition: background-color 0.2s ease;
+}
+
+.highlight:hover {
+    background-color: rgba(119, 108, 255, 0.5);
+}
+
+/* Active button state */
+.pdf-control-btn.active {
+    background-color: rgba(119, 108, 255, 0.2);
+    color: #776CFF;
+}
+
+/* Animations */
+@keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+@keyframes float {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-5px); }
+}
+
+/* Responsive Styles */
+@media (max-width: 1024px) {
+    .pdf-chat-container {
+        flex-direction: column;
+        height: auto;
+        min-height: calc(100vh - 60px);
+    }
+    
+    .resizer {
+        display: none;
+    }
+    
+    .pdf-viewer-section, .chat-section {
+        width: 100%;
+        margin-bottom: 0;
+    }
+    
+    .pdf-viewer-section {
+        height: 60vh;
+    }
+    
+    .chat-section {
+        margin-left: 0;
+        height: 40vh;
+        border-left: none;
+        border-top: 1px solid #e9ecef;
+    }
+}
+
+@media (max-width: 768px) {
+    .pdf-toolbar {
+        flex-wrap: wrap;
+        gap: 10px;
+        justify-content: center;
+    }
+    
+    .pdf-controls, .pdf-zoom-controls, .pdf-search, .pdf-actions {
+        margin: 5px 0;
+    }
+    
+    .pdf-search {
+        width: 100%;
+        order: 4;
+    }
+    
+    .pdf-search input {
+        width: calc(100% - 50px);
+    }
+    
+    .pdf-info {
+        max-width: 100%;
+        margin-bottom: 10px;
+        text-align: center;
+    }
+    
+    .pdf-viewer-nav {
+        flex-direction: column;
+        padding: 10px;
+    }
+    
+    .logo, .nav-actions {
+        margin-bottom: 10px;
+    }
+}
+
+@media (max-width: 480px) {
+    .pdf-info h1 {
+        font-size: 14px;
+    }
+    
+    .pdf-control-btn, .chat-action-btn {
+        width: 32px;
+        height: 32px;
+    }
+    
+    .pdf-control-btn svg, .chat-action-btn svg {
+        width: 18px;
+        height: 18px;
+    }
+    
+    .page-info {
+        font-size: 12px;
+    }
+    
+    #zoom-level {
+        font-size: 12px;
+        min-width: 40px;
+    }
+    
+    .chat-header h2 {
+        font-size: 16px;
+    }
+    
+    .message {
+        max-width: 95%;
+        padding: 8px 12px;
+    }
+    
+    .chat-input-container {
+        padding: 10px;
+    }
+    
+    #chat-input {
+        padding: 8px 12px;
+    }
+    
+    .send-btn {
+        width: 36px;
+        height: 36px;
+    }
+}
+
+/* Button press effect */
+.button-press {
+    transform: scale(0.9);
+    transition: transform 0.1s ease;
+}
+
+/* Disabled button effect */
+.disabled-btn {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+@keyframes shake {
+    0%, 100% { transform: translateX(0); }
+    25% { transform: translateX(-5px); }
+    75% { transform: translateX(5px); }
+}
+
+/* Error shake animation */
+.error-shake {
+    animation: error-shake 0.5s ease;
+}
+
+@keyframes error-shake {
+    0%, 100% { transform: translateX(0); }
+    10%, 30%, 50%, 70%, 90% { transform: translateX(-5px); }
+    20%, 40%, 60%, 80% { transform: translateX(5px); }
+}
+
+/* Search success animation */
+.search-success {
+    border-color: #776CFF !important;
+    background-color: rgba(119, 108, 255, 0.1);
+    animation: pulse-success 1s ease;
+}
+
+@keyframes pulse-success {
+    0% { box-shadow: 0 0 0 0 rgba(119, 108, 255, 0.4); }
+    70% { box-shadow: 0 0 0 10px rgba(119, 108, 255, 0); }
+    100% { box-shadow: 0 0 0 0 rgba(119, 108, 255, 0); }
+}
+
+/* Focus effect */
+.focus-effect {
+    border-color: #776CFF !important;
+    animation: pulse-focus 0.5s ease;
+}
+
+@keyframes pulse-focus {
+    0% { box-shadow: 0 0 0 0 rgba(119, 108, 255, 0.4); }
+    70% { box-shadow: 0 0 0 5px rgba(119, 108, 255, 0); }
+    100% { box-shadow: 0 0 0 0 rgba(119, 108, 255, 0); }
+}
+
+/* Page change animation */
+.page-change {
+    animation: page-change 0.3s ease;
+}
+
+@keyframes page-change {
+    0% { transform: scale(1); }
+    50% { transform: scale(1.2); }
+    100% { transform: scale(1); }
+}
+
+/* Zoom change animation */
+.zoom-change {
+    animation: zoom-change 0.3s ease;
+}
+
+@keyframes zoom-change {
+    0% {
+        transform: scale(1);
+    }
+    50% {
+        transform: scale(1.05);
+    }
+    100% {
+        transform: scale(1);
+    }
+}
+
+/* Searching animation */
+.searching {
+    animation: searching 1s infinite;
+}
+
+@keyframes searching {
+    0%, 100% { transform: rotate(0deg); }
+    25% { transform: rotate(90deg); }
+    50% { transform: rotate(180deg); }
+    75% { transform: rotate(270deg); }
+}
+
+/* Downloading animation */
+.downloading {
+    animation: downloading 1s infinite;
+}
+
+@keyframes downloading {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(3px); }
+}
+
+/* Page loading indicator */
+.page-loading-indicator {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    background-color: rgba(255, 255, 255, 0.9);
+    padding: 20px;
+    border-radius: 10px;
+    z-index: 10;
+    font-family: 'Onest', sans-serif;
+    font-size: 14px;
+    color: #333;
+}
+
+[data-theme="dark"] .page-loading-indicator {
+    background-color: rgba(26, 26, 26, 0.9);
+    color: #f0f0f0;
+}
+
+.loading-spinner {
+    display: inline-block;
+    position: relative;
+    width: 40px;
+    height: 40px;
+    margin-bottom: 10px;
+}
+
+.loading-spinner div {
+    box-sizing: border-box;
+    display: block;
+    position: absolute;
+    width: 32px;
+    height: 32px;
+    margin: 4px;
+    border: 4px solid #776CFF;
+    border-radius: 50%;
+    animation: loading-spinner 1.2s cubic-bezier(0.5, 0, 0.5, 1) infinite;
+    border-color: #776CFF transparent transparent transparent;
+}
+
+.loading-spinner div:nth-child(1) {
+    animation-delay: -0.45s;
+}
+
+.loading-spinner div:nth-child(2) {
+    animation-delay: -0.3s;
+}
+
+.loading-spinner div:nth-child(3) {
+    animation-delay: -0.15s;
+}
+
+.loading-spinner div:nth-child(4) {
+    animation-delay: 0s;
+}
+
+@keyframes loading-spinner {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+/* Update chat header title */
+.chat-header h2 {
+    font-size: 18px;
+    font-weight: 600;
+    margin: 0;
+    color: #333;
+    font-family: 'Onest', sans-serif;
+}
+
+/* Update tooltip styles to match the requested design */
+.pdf-control-btn[data-tooltip]::before,
+.chat-action-btn[data-tooltip]::before {
+    content: attr(data-tooltip);
+    position: absolute;
+    bottom: -35px;
+    left: 50%;
+    transform: translateX(-50%);
+    padding: 5px 10px;
+    background-color: #776CFF;
+    color: white;
+    border-radius: 20px;
+    font-family: 'Onest', sans-serif;
+    font-size: 12px;
+    white-space: nowrap;
+    opacity: 0;
+    visibility: hidden;
+    transition: opacity 0.2s ease, visibility 0.2s ease;
+    z-index: 100;
+    transform: translateX(-50%);
+}
+
+/* Show tooltip on hover */
+.pdf-control-btn[data-tooltip]:hover::before,
+.chat-action-btn[data-tooltip]:hover::before {
+    opacity: 1;
+    visibility: visible;
+} 
