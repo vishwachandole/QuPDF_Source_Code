@@ -251,7 +251,7 @@ document.addEventListener("DOMContentLoaded", function () {
             return false;
         }
 
-        // Check file type
+        // Check file type but don't return false immediately
         if (file.type !== "application/pdf") {
             const error = getErrorTypeAndMessage('invalid_format');
             showError(error.message, error.type);
@@ -438,7 +438,7 @@ document.addEventListener("DOMContentLoaded", function () {
     uploadButton?.addEventListener("click", function () {
         let fileInput = document.createElement("input");
         fileInput.type = "file";
-        fileInput.accept = "application/pdf"; // Only accept PDF files
+        fileInput.accept = "*"; // Accept all file formats
         fileInput.onchange = function (event) {
             // Check for multiple files (shouldn't happen with input[type=file] without multiple attribute)
             if (event.target.files.length > 1) {
@@ -510,7 +510,27 @@ document.addEventListener("DOMContentLoaded", function () {
     const getStartedBtn = document.getElementById("btn-get-started");
     if (getStartedBtn) {
         getStartedBtn.addEventListener("click", function () {
-            document.getElementById("heroSection")?.scrollIntoView({ behavior: "smooth" });
+            // Create and trigger file input immediately
+            let fileInput = document.createElement("input");
+            fileInput.type = "file";
+            fileInput.accept = "*"; // Accept all file formats
+            fileInput.onchange = function (event) {
+                // Check for multiple files
+                if (event.target.files.length > 1) {
+                    const error = getErrorTypeAndMessage('multiple_files');
+                    showError(error.message, error.type);
+                    return;
+                }
+                
+                const file = event.target.files[0];
+                handleFile(file);
+                
+                // Scroll to the upload section after file selection
+                document.getElementById("heroSection")?.scrollIntoView({ behavior: "smooth" });
+            };
+            
+            // Trigger file picker immediately
+            fileInput.click();
         });
     }
     

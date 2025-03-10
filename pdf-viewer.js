@@ -15,6 +15,10 @@ let highlights = [];
 let isHighlightMode = false;
 let selectedText = '';
 let chatHistory = [];
+let allPagesRendered = false;
+let canvasElements = []; // Array to store all canvas elements
+let searchResults = [];
+let currentSearchIndex = -1;
 
 // DOM Elements
 const prevButton = document.getElementById('prev-page');
@@ -47,6 +51,14 @@ const chatSection = document.querySelector('.chat-section');
 
 // Initialize the viewer
 document.addEventListener('DOMContentLoaded', function() {
+    // Reset notification state
+    if (notification) {
+        notification.classList.remove('show');
+        if (notificationMessage) {
+            notificationMessage.textContent = '';
+        }
+    }
+    
     // Initialize canvas and context
     canvas = document.getElementById('pdf-canvas');
     if (canvas) {
@@ -69,29 +81,11 @@ document.addEventListener('DOMContentLoaded', function() {
         }
         loadPdfFromData(storedPdfData);
     } else {
-        // For testing purposes, load a sample PDF if no data in session storage
-        const samplePdfUrl = 'https://raw.githubusercontent.com/mozilla/pdf.js/ba2edeae/web/compressed.tracemonkey-pldi-09.pdf';
-        
-        fetch(samplePdfUrl)
-            .then(response => response.arrayBuffer())
-            .then(arrayBuffer => {
-                const bytes = new Uint8Array(arrayBuffer);
-                let binary = '';
-                for (let i = 0; i < bytes.byteLength; i++) {
-                    binary += String.fromCharCode(bytes[i]);
-                }
-                pdfData = btoa(binary);
-                pdfTitle.textContent = "Sample PDF Document";
-                loadPdfFromData(pdfData);
-            })
-            .catch(error => {
-                console.error("Error loading sample PDF:", error);
-                showNotification("Error loading PDF. Please return to home page and try again.", "error");
-                // No PDF data found, redirect to home page after a delay
-                setTimeout(() => {
-                    window.location.href = 'index.html';
-                }, 3000);
-            });
+        // Show message that no PDF was loaded
+        showNotification("No PDF loaded. Please upload a PDF from the home page.", "error");
+        setTimeout(() => {
+            window.location.href = 'index.html';
+        }, 3000);
     }
     
     // Set up event listeners
@@ -128,20 +122,18 @@ function setupEventListeners() {
     
     // Back to home
     backButton.addEventListener('click', function() {
-        // Add fade-out animation before redirecting
-        document.body.style.opacity = '0';
-        document.body.style.transition = 'opacity 0.3s ease';
-        setTimeout(() => {
-            window.location.href = 'index.html';
-        }, 300);
+        window.location.href = 'index.html';
     });
     
     // Chat functionality
     if (sendMessageButton) {
         sendMessageButton.addEventListener('click', sendMessage);
+    } else {
+        console.error("Send message button not found");
     }
     
     if (chatInput) {
+        // Handle Enter key for sending message
         chatInput.addEventListener('keypress', function(e) {
             if (e.key === 'Enter' && !e.shiftKey) {
                 e.preventDefault();
@@ -149,456 +141,438 @@ function setupEventListeners() {
             }
         });
         
-        // Auto-resize textarea
-        chatInput.addEventListener('input', function() {
-            this.style.height = 'auto';
-            this.style.height = Math.min(this.scrollHeight, 120) + 'px';
-        });
+        // Auto-resize chat input based on content
+        chatInput.addEventListener('input', autoResizeChatInput);
+        
+        // Ensure the chat input is properly initialized
+        chatInput.value = '';
+        chatInput.style.height = 'auto';
+        
+        // Initial call to set correct height
+        autoResizeChatInput.call(chatInput);
+    } else {
+        console.error("Chat input element not found");
     }
     
-    // Chat action buttons
-    if (shareChatButton) {
-        shareChatButton.addEventListener('click', shareChat);
-    }
+    // Share, export, and delete chat
+    if (shareChatButton) shareChatButton.addEventListener('click', shareChat);
+    if (exportChatButton) exportChatButton.addEventListener('click', exportChat);
+    if (deleteChatButton) deleteChatButton.addEventListener('click', clearChat);
     
-    if (exportChatButton) {
-        exportChatButton.addEventListener('click', exportChat);
-    }
-    
-    if (deleteChatButton) {
-        deleteChatButton.addEventListener('click', clearChat);
-    }
-    
-    // Notification close button
+    // Notification close
     if (notificationClose) {
         notificationClose.addEventListener('click', function() {
-            notification.classList.add('fade-out');
-            setTimeout(() => {
-                notification.classList.remove('show');
-                notification.classList.remove('fade-out');
-            }, 500);
+            notification.classList.remove('show');
         });
     }
     
-    // Text selection for highlighting
-    if (pdfContainer) {
-        pdfContainer.addEventListener('mouseup', function() {
-            if (isHighlightMode) {
-                const selection = window.getSelection();
-                selectedText = selection.toString().trim();
-                
-                if (selectedText) {
-                    // In a real implementation, you would create highlight elements
-                    // For this demo, we'll just show a notification
-                    showNotification(`Text "${selectedText}" has been highlighted`, 'info');
-                    
-                    // Add to highlights array (in a real app, you'd store position data too)
-                    highlights.push({
-                        text: selectedText,
-                        page: pageNum
-                    });
-                    
-                    // Clear selection
-                    selection.removeAllRanges();
-                }
-            }
-        });
-    }
-    
-    // Handle keyboard shortcuts
+    // Keyboard shortcuts
     document.addEventListener('keydown', function(e) {
-        // Left arrow: previous page
-        if (e.key === 'ArrowLeft') {
-            onPrevPage();
-            // Add button press effect
-            addButtonPressEffect(prevButton);
-        }
-        // Right arrow: next page
-        else if (e.key === 'ArrowRight') {
-            onNextPage();
-            // Add button press effect
-            addButtonPressEffect(nextButton);
-        }
-        // Ctrl + '+': zoom in
-        else if (e.key === '+' && (e.ctrlKey || e.metaKey)) {
-            e.preventDefault();
-            zoomIn();
-            // Add button press effect
-            addButtonPressEffect(zoomInButton);
-        }
-        // Ctrl + '-': zoom out
-        else if (e.key === '-' && (e.ctrlKey || e.metaKey)) {
-            e.preventDefault();
-            zoomOut();
-            // Add button press effect
-            addButtonPressEffect(zoomOutButton);
-        }
-        // Ctrl + '0': reset zoom
-        else if (e.key === '0' && (e.ctrlKey || e.metaKey)) {
-            e.preventDefault();
-            resetZoom();
-            // Add button press effect
-            addButtonPressEffect(resetZoomButton);
-        }
-        // Ctrl + 'f': focus search
-        else if (e.key === 'f' && (e.ctrlKey || e.metaKey)) {
-            e.preventDefault();
-            searchInput.focus();
-            // Add visual feedback
-            searchInput.classList.add('focus-effect');
-            setTimeout(() => {
-                searchInput.classList.remove('focus-effect');
-            }, 300);
-        }
-        // Ctrl + 'h': toggle highlight mode
-        else if (e.key === 'h' && (e.ctrlKey || e.metaKey)) {
-            e.preventDefault();
-            toggleHighlightMode();
-            // Add button press effect
-            addButtonPressEffect(highlightButton);
-        }
-        // Ctrl + 'd': download PDF
-        else if (e.key === 'd' && (e.ctrlKey || e.metaKey)) {
-            e.preventDefault();
-            downloadPdf();
-            // Add button press effect
-            addButtonPressEffect(downloadButton);
+        // Check if no input is focused
+        if (document.activeElement === document.body || document.activeElement === document.documentElement) {
+            if (e.key === 'ArrowLeft' || e.key === 'p') {
+                onPrevPage();
+            } else if (e.key === 'ArrowRight' || e.key === 'n') {
+                onNextPage();
+            } else if (e.key === '+' || e.key === '=') {
+                zoomIn();
+            } else if (e.key === '-') {
+                zoomOut();
+            } else if (e.key === '0') {
+                resetZoom();
+            }
         }
     });
+    
+    // Add button press effect to all buttons
+    document.querySelectorAll('button').forEach(button => {
+        addButtonPressEffect(button);
+    });
+    
+    // Add text selection event listener
+    document.addEventListener('mouseup', handleHighlight);
 }
 
-// Set up resizer functionality
+// Auto-resize textarea based on content
+function autoResizeChatInput() {
+    // Reset height to auto to get the correct scrollHeight
+    this.style.height = 'auto';
+    
+    // Set to scrollHeight to match content (with min and max constraints)
+    const newHeight = Math.min(Math.max(this.scrollHeight, 45), 120);
+    this.style.height = newHeight + 'px';
+}
+
+// Setup resizer for adjusting panel widths
 function setupResizer() {
     let isResizing = false;
-    let initialX;
-    let initialPdfWidth;
-    let initialChatWidth;
+    
+    if (!resizer) {
+        console.error("Resizer element not found");
+        return;
+    }
     
     resizer.addEventListener('mousedown', function(e) {
         isResizing = true;
-        initialX = e.clientX;
-        initialPdfWidth = pdfViewerSection.offsetWidth;
-        initialChatWidth = chatSection.offsetWidth;
-        
         resizer.classList.add('active');
-        
-        document.addEventListener('mousemove', handleMouseMove);
-        document.addEventListener('mouseup', handleMouseUp);
-        
-        // Prevent text selection during resize
+        document.body.style.cursor = 'ew-resize';
         document.body.style.userSelect = 'none';
+        e.preventDefault();
     });
     
-    function handleMouseMove(e) {
+    document.addEventListener('mousemove', function(e) {
         if (!isResizing) return;
         
-        const containerWidth = document.querySelector('.pdf-chat-container').offsetWidth;
-        const dx = e.clientX - initialX;
+        const containerRect = document.querySelector('.pdf-chat-container').getBoundingClientRect();
+        const containerWidth = containerRect.width;
+        const mouseX = e.clientX - containerRect.left;
         
-        // Calculate new widths
-        let newPdfWidth = initialPdfWidth + dx;
-        let newChatWidth = initialChatWidth - dx;
+        // Calculate percentages
+        const pdfSectionWidth = Math.max(30, Math.min(70, (mouseX / containerWidth) * 100));
+        const chatSectionWidth = 100 - pdfSectionWidth;
         
-        // Ensure minimum widths (20% of container)
-        const minWidth = containerWidth * 0.2;
-        if (newPdfWidth < minWidth) {
-            newPdfWidth = minWidth;
-            newChatWidth = containerWidth - minWidth;
-        } else if (newChatWidth < minWidth) {
-            newChatWidth = minWidth;
-            newPdfWidth = containerWidth - minWidth;
+        // Apply new widths
+        pdfViewerSection.style.width = `${pdfSectionWidth}%`;
+        chatSection.style.width = `${chatSectionWidth}%`;
+        
+        // Re-render PDF with new container size
+        if (pdfDoc) {
+            renderPage(pageNum);
         }
-        
-        // Update widths
-        const pdfPercent = (newPdfWidth / containerWidth) * 100;
-        const chatPercent = (newChatWidth / containerWidth) * 100;
-        
-        pdfViewerSection.style.width = `${pdfPercent}%`;
-        chatSection.style.width = `${chatPercent}%`;
-        resizer.style.left = `${pdfPercent}%`;
-    }
+    });
     
-    function handleMouseUp() {
-        isResizing = false;
-        resizer.classList.remove('active');
-        
-        document.removeEventListener('mousemove', handleMouseMove);
-        document.removeEventListener('mouseup', handleMouseUp);
-        
-        // Re-enable text selection
-        document.body.style.userSelect = '';
-    }
+    document.addEventListener('mouseup', function() {
+        if (isResizing) {
+            isResizing = false;
+            resizer.classList.remove('active');
+            document.body.style.cursor = '';
+            document.body.style.userSelect = '';
+        }
+    });
 }
 
 // Add button press effect
 function addButtonPressEffect(button) {
-    if (!button) return;
+    button.addEventListener('mousedown', function() {
+        this.classList.add('button-press');
+    });
     
-    button.classList.add('button-press');
-    setTimeout(() => {
-        button.classList.remove('button-press');
-    }, 200);
+    button.addEventListener('mouseup mouseout', function() {
+        this.classList.remove('button-press');
+    });
 }
 
 // Load PDF from data URL or binary data
 function loadPdfFromData(data) {
     try {
-        // Show loading notification
-        showNotification('Loading PDF document...', 'info');
+        // Clear any existing content
+        clearPdfContainer();
+        
+        // Reset variables
+        pageNum = 1;
+        scale = 1.0;
+        updateZoomLevel();
+        pageRendering = false;
+        pageNumPending = null;
+        allPagesRendered = false;
+        canvasElements = [];
+        
+        // Check if data is valid
+        if (!data || typeof data !== 'string') {
+            throw new Error('Invalid PDF data provided');
+        }
         
         // Using PDF.js to load the PDF
-        const loadingTask = pdfjsLib.getDocument({ data: atob(data) });
-        
-        loadingTask.promise.then(function(pdf) {
-            pdfDoc = pdf;
-            totalPagesSpan.textContent = pdf.numPages;
+        try {
+            // Try to decode the base64 data
+            const pdfData = atob(data);
             
-            // Initial page rendering
-            renderPage(pageNum);
+            // Using PDF.js to load the PDF
+            const loadingTask = pdfjsLib.getDocument({ data: pdfData });
             
-            // Success notification
-            showNotification('PDF loaded successfully!', 'info');
-        }).catch(function(error) {
-            console.error('Error loading PDF:', error);
-            showNotification('Error loading PDF: ' + error.message, 'error');
-        });
+            // Add loading task progress handler
+            loadingTask.onProgress = function(progress) {
+                // Only show notification for significant progress milestones
+                const percent = Math.round(progress.loaded / progress.total * 100);
+                if (percent === 25 || percent === 50 || percent === 75) {
+                    showNotification(`Loading PDF: ${percent}%`, 'info');
+                }
+            };
+            
+            loadingTask.promise.then(function(pdf) {
+                pdfDoc = pdf;
+                currentPDF = pdf;
+                totalPagesSpan.textContent = pdf.numPages;
+                
+                console.log(`PDF loaded successfully with ${pdf.numPages} pages`);
+                
+                // Enable navigation buttons if there are multiple pages
+                if (pdf.numPages > 1) {
+                    nextButton.classList.remove('disabled-btn');
+                }
+                
+                // Render all pages
+                renderAllPages();
+            }).catch(function(error) {
+                console.error('Error loading PDF:', error);
+                showNotification('Error loading PDF: ' + error.message, 'error');
+            });
+        } catch (e) {
+            console.error('Error decoding PDF data:', e);
+            showNotification('Error loading PDF: Invalid data format', 'error');
+        }
     } catch (error) {
         console.error('Exception while loading PDF:', error);
         showNotification('Error loading PDF: ' + error.message, 'error');
     }
 }
 
-// Render a specific page
-function renderPage(num) {
-    pageRendering = true;
+// Clear the PDF container
+function clearPdfContainer() {
+    // Remove all existing canvases and text layers
+    while (pdfContainer.firstChild) {
+        pdfContainer.removeChild(pdfContainer.firstChild);
+    }
+}
+
+// Render all pages in a vertical layout
+function renderAllPages() {
+    if (!pdfDoc) return;
     
-    // Show loading indicator for page
-    const loadingIndicator = document.createElement('div');
-    loadingIndicator.className = 'page-loading-indicator';
-    loadingIndicator.innerHTML = `
-        <div class="loading-spinner">
-            <div></div><div></div><div></div><div></div>
+    clearPdfContainer();
+    
+    // Create a loader container
+    const loaderContainer = document.createElement('div');
+    loaderContainer.className = 'pdf-loader-container';
+    loaderContainer.innerHTML = `
+        <div class="pdf-global-loader">
+            <div class="pdf-loader-spinner"></div>
+            <div class="pdf-loader-text">Preparing your document...</div>
+            <div class="pdf-loader-progress">
+                <div class="pdf-loader-progress-bar"></div>
+            </div>
         </div>
-        <div>Loading page ${num}...</div>
     `;
-    pdfContainer.appendChild(loadingIndicator);
     
-    // Get page
-    pdfDoc.getPage(num).then(function(page) {
-        // Adjust scale based on viewport
+    // Create a wrapper div for the pages
+    const pagesWrapper = document.createElement('div');
+    pagesWrapper.className = 'pdf-pages-wrapper';
+    pdfContainer.appendChild(pagesWrapper);
+    
+    // Add the loader to the PDF container
+    pdfContainer.appendChild(loaderContainer);
+    
+    const progressBar = loaderContainer.querySelector('.pdf-loader-progress-bar');
+    const progressText = loaderContainer.querySelector('.pdf-loader-text');
+    
+    const totalPages = pdfDoc.numPages;
+    let pagesRendered = 0;
+    
+    // Render each page
+    for (let i = 1; i <= totalPages; i++) {
+        renderPageToContainer(i, pagesWrapper, function() {
+            pagesRendered++;
+            
+            // Update progress
+            const percent = Math.round((pagesRendered / totalPages) * 100);
+            progressBar.style.width = `${percent}%`;
+            progressText.textContent = `Rendering pages... ${pagesRendered} of ${totalPages}`;
+            
+            if (pagesRendered === totalPages) {
+                // All pages rendered
+                allPagesRendered = true;
+                
+                // Fade out and remove the loader
+                loaderContainer.classList.add('fade-out');
+                setTimeout(() => {
+                    if (loaderContainer.parentNode) {
+                        loaderContainer.parentNode.removeChild(loaderContainer);
+                    }
+                }, 500);
+            }
+        });
+    }
+}
+
+// Render a specific page to the container
+function renderPageToContainer(pageNumber, container, callback) {
+    pdfDoc.getPage(pageNumber).then(function(page) {
+        // Create page container
+        const pageContainer = document.createElement('div');
+        pageContainer.className = 'pdf-page-container';
+        pageContainer.setAttribute('data-page-number', pageNumber);
+        
+        // Create canvas for this page
+        const pageCanvas = document.createElement('canvas');
+        pageCanvas.className = 'pdf-page-canvas';
+        
+        // Get page viewport with current scale
         const viewport = page.getViewport({ scale: scale });
         
         // Set canvas dimensions
-        canvas.height = viewport.height;
-        canvas.width = viewport.width;
+        pageCanvas.height = viewport.height;
+        pageCanvas.width = viewport.width;
+        pageContainer.style.width = `${viewport.width}px`;
+        pageContainer.style.height = `${viewport.height}px`;
+        
+        // Get canvas context
+        const pageCtx = pageCanvas.getContext('2d');
+        
+        // Add canvas to page container
+        pageContainer.appendChild(pageCanvas);
+        
+        // Add to container before rendering
+        container.appendChild(pageContainer);
         
         // Render PDF page
         const renderContext = {
-            canvasContext: ctx,
+            canvasContext: pageCtx,
             viewport: viewport
         };
         
         const renderTask = page.render(renderContext);
         
+        // Store canvas element
+        canvasElements[pageNumber - 1] = pageCanvas;
+        
         // Wait for rendering to finish
         renderTask.promise.then(function() {
-            pageRendering = false;
+            // Create text layer for this page
+            createTextLayerForPage(page, viewport, pageContainer);
             
-            // Remove loading indicator
-            if (loadingIndicator.parentNode) {
-                loadingIndicator.parentNode.removeChild(loadingIndicator);
-            }
+            // Add page number indicator
+            const pageNumberIndicator = document.createElement('div');
+            pageNumberIndicator.className = 'page-number-indicator';
+            pageNumberIndicator.textContent = 'Page ' + pageNumber;
+            pageContainer.appendChild(pageNumberIndicator);
             
-            // Apply any highlights
-            applyHighlights();
-            
-            // Check if there's a pending page
-            if (pageNumPending !== null) {
-                renderPage(pageNumPending);
-                pageNumPending = null;
-            }
-            
-            // Enable text selection
-            enableTextSelection();
-            
-            // Create text layer for selection and search
-            createTextLayer(page, viewport);
+            // Call the callback when rendering is complete
+            if (callback) callback();
+        }).catch(function(error) {
+            console.error(`Error rendering page ${pageNumber}:`, error);
+            if (callback) callback();
         });
-        
-        // Update page counters
-        currentPageSpan.textContent = num;
+    }).catch(function(error) {
+        console.error(`Error getting page ${pageNumber}:`, error);
+        if (callback) callback();
     });
 }
 
-// Create text layer for selection and search
-function createTextLayer(page, viewport) {
-    // Remove existing text layer if any
-    if (textLayerDiv) {
-        if (textLayerDiv.parentNode) {
-            textLayerDiv.parentNode.removeChild(textLayerDiv);
-        }
-    }
-    
-    // Create new text layer div
-    textLayerDiv = document.createElement('div');
+// Create text layer for a specific page
+function createTextLayerForPage(page, viewport, container) {
+    // Create text layer div
+    const textLayerDiv = document.createElement('div');
     textLayerDiv.className = 'textLayer';
     textLayerDiv.style.width = `${viewport.width}px`;
     textLayerDiv.style.height = `${viewport.height}px`;
     
-    // Create a wrapper div to position the text layer correctly
-    const textLayerWrapper = document.createElement('div');
-    textLayerWrapper.style.position = 'absolute';
-    textLayerWrapper.style.top = `${canvas.offsetTop}px`;
-    textLayerWrapper.style.left = `${canvas.offsetLeft}px`;
-    textLayerWrapper.style.width = `${viewport.width}px`;
-    textLayerWrapper.style.height = `${viewport.height}px`;
-    textLayerWrapper.style.zIndex = '2';
+    // Add the text layer to the container
+    container.appendChild(textLayerDiv);
     
-    // Add text layer to wrapper
-    textLayerWrapper.appendChild(textLayerDiv);
-    
-    // Add wrapper to container
-    pdfContainer.appendChild(textLayerWrapper);
-    
-    // Get the text content
+    // Get text content
     page.getTextContent().then(function(textContent) {
         // Create text layer with PDF.js
         pdfjsLib.renderTextLayer({
             textContent: textContent,
             container: textLayerDiv,
             viewport: viewport,
-            textDivs: []
-        }).promise.then(() => {
-            // Make text layer visible after rendering
-            textLayerDiv.style.opacity = '0.2';
+            textDivs: [],
+            enhanceTextSelection: true,
+            includeWhitespace: true
         });
     });
 }
 
-// Enable text selection on the canvas
-function enableTextSelection() {
-    // This is a simplified approach - in a real app, you'd use PDF.js text layer
-    canvas.style.userSelect = 'text';
-    canvas.style.webkitUserSelect = 'text';
-    canvas.style.mozUserSelect = 'text';
-    canvas.style.msUserSelect = 'text';
-}
-
-// Go to previous page
-function onPrevPage() {
-    if (pageNum <= 1) {
-        // Visual feedback for being on first page
-        prevButton.classList.add('disabled-btn');
-        setTimeout(() => {
-            prevButton.classList.remove('disabled-btn');
-        }, 300);
-        return;
-    }
-    pageNum--;
-    queueRenderPage(pageNum);
-}
-
-// Go to next page
-function onNextPage() {
-    if (pageNum >= pdfDoc.numPages) {
-        // Visual feedback for being on last page
-        nextButton.classList.add('disabled-btn');
-        setTimeout(() => {
-            nextButton.classList.remove('disabled-btn');
-        }, 300);
-        return;
-    }
-    pageNum++;
-    queueRenderPage(pageNum);
-}
-
-// Queue rendering of a page
-function queueRenderPage(num) {
-    if (pageRendering) {
-        pageNumPending = num;
-    } else {
-        renderPage(num);
-    }
+// Update zoom for all pages
+function updateZoomForAllPages() {
+    if (!pdfDoc || canvasElements.length === 0) return;
+    
+    // Store current scroll position
+    const container = document.querySelector('.pdf-container');
+    const scrollTop = container.scrollTop;
+    const scrollLeft = container.scrollLeft;
+    const containerHeight = container.clientHeight;
+    
+    // Calculate center point
+    const centerY = scrollTop + (containerHeight / 2);
+    const scrollRatio = centerY / container.scrollHeight;
+    
+    // Re-render all pages with new scale
+    renderAllPages();
+    
+    // After re-rendering, scroll to maintain relative position
+    requestAnimationFrame(() => {
+        container.scrollTop = container.scrollHeight * scrollRatio;
+        container.scrollLeft = scrollLeft * (scale / (scale - 0.25));
+    });
 }
 
 // Zoom in
 function zoomIn() {
-    scale += 0.25;
-    if (scale > 3) {
-        scale = 3; // Max zoom
-        // Visual feedback for max zoom
+    if (!pdfDoc) {
+        console.error('No PDF document loaded');
+        return;
+    }
+    
+    if (scale >= 3) {
         zoomInButton.classList.add('disabled-btn');
         setTimeout(() => {
             zoomInButton.classList.remove('disabled-btn');
         }, 300);
+        return;
     }
+    
+    scale += 0.25;
     updateZoomLevel();
-    
-    // Force re-render of the current page with new scale
-    pageRendering = false;
-    pageNumPending = null;
-    renderPage(pageNum);
-    
-    // Add visual feedback for zoom change
-    canvas.classList.add('zoom-change');
-    setTimeout(() => {
-        canvas.classList.remove('zoom-change');
-    }, 300);
+    updateZoomForAllPages();
 }
 
 // Zoom out
 function zoomOut() {
-    scale -= 0.25;
-    if (scale < 0.5) {
-        scale = 0.5; // Min zoom
-        // Visual feedback for min zoom
+    if (!pdfDoc) {
+        console.error('No PDF document loaded');
+        return;
+    }
+    
+    if (scale <= 0.5) {
         zoomOutButton.classList.add('disabled-btn');
         setTimeout(() => {
             zoomOutButton.classList.remove('disabled-btn');
         }, 300);
+        return;
     }
+    
+    scale -= 0.25;
     updateZoomLevel();
-    
-    // Force re-render of the current page with new scale
-    pageRendering = false;
-    pageNumPending = null;
-    renderPage(pageNum);
-    
-    // Add visual feedback for zoom change
-    canvas.classList.add('zoom-change');
-    setTimeout(() => {
-        canvas.classList.remove('zoom-change');
-    }, 300);
+    updateZoomForAllPages();
 }
 
 // Reset zoom
 function resetZoom() {
+    if (!pdfDoc) {
+        console.error('No PDF document loaded');
+        return;
+    }
+    
     scale = 1.0;
     updateZoomLevel();
-    
-    // Force re-render of the current page with new scale
-    pageRendering = false;
-    pageNumPending = null;
-    renderPage(pageNum);
-    
-    // Visual feedback for reset
-    resetZoomButton.classList.add('active');
-    setTimeout(() => {
-        resetZoomButton.classList.remove('active');
-    }, 300);
+    updateZoomForAllPages();
 }
 
 // Update zoom level display
 function updateZoomLevel() {
-    const percentage = Math.round(scale * 100);
-    zoomLevelSpan.textContent = percentage + '%';
+    zoomLevelSpan.textContent = `${Math.round(scale * 100)}%`;
 }
 
-// Search functionality
+// Search in PDF
 function search() {
+    if (!pdfDoc) {
+        showNotification('No PDF loaded to search', 'error');
+        return;
+    }
+    
     const searchTerm = searchInput.value.trim();
     if (!searchTerm) {
-        // Visual feedback for empty search
         searchInput.classList.add('error-shake');
         setTimeout(() => {
             searchInput.classList.remove('error-shake');
@@ -606,164 +580,336 @@ function search() {
         return;
     }
     
-    // Add search animation
-    searchButton.classList.add('searching');
-    
-    // Clear previous highlights
+    // Clear previous highlights and reset search state
     clearSearchHighlights();
+    searchResults = [];
+    currentSearchIndex = -1;
     
-    // Keep track of search results
-    let totalMatches = 0;
-    let currentPage = pageNum;
-    let foundOnCurrentPage = false;
+    showNotification(`Searching for "${searchTerm}"...`, 'info');
     
-    // Function to search a single page
-    function searchPage(pageIndex) {
-        return pdfDoc.getPage(pageIndex).then(page => {
-            return page.getTextContent().then(textContent => {
-                const text = textContent.items.map(item => item.str).join(' ');
-                const regex = new RegExp(searchTerm, 'gi');
-                const matches = text.match(regex);
-                
-                if (matches && matches.length > 0) {
-                    totalMatches += matches.length;
-                    
-                    // If we're not on the page with matches, go to it
-                    if (pageIndex !== pageNum && !foundOnCurrentPage) {
-                        pageNum = pageIndex;
-                        queueRenderPage(pageNum);
-                        foundOnCurrentPage = true;
-                    }
-                    
-                    // Highlight matches on current page
-                    if (pageIndex === pageNum) {
-                        foundOnCurrentPage = true;
-                        highlightSearchResults(textContent, searchTerm);
-                    }
-                    
-                    return true;
-                }
-                return false;
-            });
-        });
+    // Search through all pages
+    const promises = [];
+    for (let i = 1; i <= pdfDoc.numPages; i++) {
+        promises.push(searchInPage(i, searchTerm));
     }
     
-    // Start with current page
-    searchPage(currentPage).then(found => {
-        if (!found) {
-            // If not found on current page, search through all pages
-            const searchPromises = [];
-            for (let i = 1; i <= pdfDoc.numPages; i++) {
-                if (i !== currentPage) {
-                    searchPromises.push(searchPage(i));
-                }
+    Promise.all(promises).then(results => {
+        // Collect all search results
+        results.forEach((result, pageIndex) => {
+            if (result.matches.length > 0) {
+                searchResults.push(...result.matches.map(match => ({
+                    ...match,
+                    pageNumber: pageIndex + 1
+                })));
             }
-            
-            Promise.all(searchPromises).then(() => {
-                finishSearch(totalMatches);
-            });
+        });
+        
+        if (searchResults.length > 0) {
+            showNotification(`Found ${searchResults.length} matches`, 'info');
+            showSearchControls(searchResults.length);
+            navigateToSearchResult(0); // Go to first result
         } else {
-            finishSearch(totalMatches);
+            showNotification(`No matches found for "${searchTerm}"`, 'info');
+            hideSearchControls();
         }
     });
 }
 
-// Highlight search results
-function highlightSearchResults(textContent, searchTerm) {
-    if (!textLayerDiv) return;
-    
-    // Wait for text layer to be fully rendered
-    setTimeout(() => {
-        const textDivs = textLayerDiv.querySelectorAll('span');
-        const regex = new RegExp(searchTerm, 'gi');
-        let foundAny = false;
-        
-        textDivs.forEach(div => {
-            const text = div.textContent;
-            if (regex.test(text)) {
-                div.classList.add('highlight');
-                foundAny = true;
+// Search in a specific page
+function searchInPage(pageIndex, searchTerm) {
+    return new Promise((resolve) => {
+        pdfDoc.getPage(pageIndex).then(page => {
+            page.getTextContent().then(textContent => {
+                const matches = [];
+                const pageContainer = document.querySelector(`.pdf-page-container[data-page-number="${pageIndex}"]`);
+                const textLayer = pageContainer ? pageContainer.querySelector('.textLayer') : null;
                 
-                // Scroll to the first match
-                if (!foundAny) {
-                    div.scrollIntoView({
-                        behavior: 'smooth',
-                        block: 'center'
-                    });
+                if (!textLayer) {
+                    resolve({ page: pageIndex, matches: [] });
+                    return;
                 }
-            }
+                
+                textContent.items.forEach((item, index) => {
+                    const text = item.str;
+                    const regex = new RegExp(searchTerm, 'gi');
+                    let match;
+                    
+                    while ((match = regex.exec(text)) !== null) {
+                        // Find the corresponding text element in the text layer
+                        const textElement = textLayer.children[index];
+                        if (textElement) {
+                            // Create highlight span
+                            const highlightSpan = document.createElement('span');
+                            highlightSpan.className = 'search-highlight';
+                            highlightSpan.textContent = match[0];
+                            
+                            // Replace the text with highlighted version
+                            const originalText = textElement.textContent;
+                            const beforeMatch = originalText.substring(0, match.index);
+                            const afterMatch = originalText.substring(match.index + match[0].length);
+                            
+                            textElement.innerHTML = '';
+                            if (beforeMatch) {
+                                textElement.appendChild(document.createTextNode(beforeMatch));
+                            }
+                            textElement.appendChild(highlightSpan);
+                            if (afterMatch) {
+                                textElement.appendChild(document.createTextNode(afterMatch));
+                            }
+                            
+                            matches.push({
+                                text: match[0],
+                                index: index,
+                                position: item.transform,
+                                element: highlightSpan
+                            });
+                        }
+                    }
+                });
+                
+                resolve({
+                    page: pageIndex,
+                    matches: matches
+                });
+            });
+        }).catch(error => {
+            console.error(`Error searching page ${pageIndex}:`, error);
+            resolve({
+                page: pageIndex,
+                matches: []
+            });
         });
-    }, 500); // Give time for text layer to render
+    });
+}
+
+// Highlight search terms in text layer
+function highlightSearchTermInTextLayer(textLayer, searchTerm) {
+    const textDivs = textLayer.querySelectorAll('span');
+    const regex = new RegExp(searchTerm, 'gi');
+    
+    textDivs.forEach(div => {
+        const text = div.textContent;
+        if (regex.test(text)) {
+            div.classList.add('search-highlight');
+        }
+    });
 }
 
 // Clear search highlights
 function clearSearchHighlights() {
-    if (!textLayerDiv) return;
-    
-    const highlights = textLayerDiv.querySelectorAll('.highlight');
-    highlights.forEach(highlight => {
-        highlight.classList.remove('highlight');
+    // Remove all search highlights
+    document.querySelectorAll('.search-highlight').forEach(el => {
+        // Get the parent text element
+        const textElement = el.parentNode;
+        if (textElement) {
+            // Replace the highlight span with its text content
+            const textNode = document.createTextNode(el.textContent);
+            textElement.replaceChild(textNode, el);
+            // Normalize the text element to combine adjacent text nodes
+            textElement.normalize();
+        }
     });
+    
+    hideSearchControls();
+    searchResults = [];
+    currentSearchIndex = -1;
 }
 
-// Finish search process
-function finishSearch(totalMatches) {
-    // Remove search animation
-    searchButton.classList.remove('searching');
-    
-    if (totalMatches > 0) {
-        // Highlight the search box to indicate success
-        searchInput.classList.add('search-success');
-        setTimeout(() => {
-            searchInput.classList.remove('search-success');
-        }, 1000);
+// Scroll to specific page
+function scrollToPage(pageNumber) {
+    const pageContainer = document.querySelector(`.pdf-page-container[data-page-number="${pageNumber}"]`);
+    if (pageContainer) {
+        pageContainer.scrollIntoView({ behavior: 'smooth', block: 'start' });
         
-        showNotification(`Found ${totalMatches} matches for "${searchInput.value}"`, 'info');
+        // Update current page display
+        currentPageSpan.textContent = pageNumber;
+        
+        // Highlight the page briefly
+        pageContainer.classList.add('page-highlight');
+        setTimeout(() => {
+            pageContainer.classList.remove('page-highlight');
+        }, 2000);
+    }
+}
+
+// Handle navigation buttons for scrolling to pages
+function onPrevPage() {
+    if (!pdfDoc) return;
+    
+    const currentPage = parseInt(currentPageSpan.textContent);
+    if (currentPage > 1) {
+        scrollToPage(currentPage - 1);
     } else {
-        showNotification(`No matches found for "${searchInput.value}"`, 'warning');
+        // Visual feedback for being on first page
+        prevButton.classList.add('disabled-btn');
+        setTimeout(() => {
+            prevButton.classList.remove('disabled-btn');
+        }, 300);
+    }
+}
+
+function onNextPage() {
+    if (!pdfDoc) return;
+    
+    const currentPage = parseInt(currentPageSpan.textContent);
+    if (currentPage < pdfDoc.numPages) {
+        scrollToPage(currentPage + 1);
+    } else {
+        // Visual feedback for being on last page
+        nextButton.classList.add('disabled-btn');
+        setTimeout(() => {
+            nextButton.classList.remove('disabled-btn');
+        }, 300);
+    }
+}
+
+// Handle text highlighting
+function handleHighlight(event) {
+    if (!isHighlightMode) return;
+    
+    const selection = window.getSelection();
+    const selectedText = selection.toString().trim();
+    
+    if (!selectedText) return;
+    
+    try {
+        const range = selection.getRangeAt(0);
+        const pageElement = event.target.closest('.pdf-page-container');
+        
+        if (!pageElement) return;
+        
+        const pageNumber = parseInt(pageElement.getAttribute('data-page-number'));
+        
+        // Create highlight element
+        const highlight = document.createElement('span');
+        highlight.className = 'highlight';
+        highlight.textContent = selectedText;
+        
+        // Get the text layer
+        const textLayer = pageElement.querySelector('.textLayer');
+        if (!textLayer) return;
+        
+        // Wrap the selected text in the highlight span
+        range.surroundContents(highlight);
+        
+        // Store highlight data
+        highlights.push({
+            text: selectedText,
+            pageNumber: pageNumber,
+            element: highlight,
+            position: {
+                top: highlight.offsetTop,
+                left: highlight.offsetLeft,
+                width: highlight.offsetWidth,
+                height: highlight.offsetHeight
+            }
+        });
+        
+        // Clear the selection
+        selection.removeAllRanges();
+        
+        // Show success notification
+        const truncatedText = selectedText.length > 30 ? selectedText.substring(0, 30) + '...' : selectedText;
+        showNotification(`Text highlighted: "${truncatedText}"`, 'success');
+    } catch (error) {
+        console.error('Error highlighting text:', error);
+        showNotification('Error highlighting text. Please try again.', 'error');
     }
 }
 
 // Toggle highlight mode
 function toggleHighlightMode() {
     isHighlightMode = !isHighlightMode;
-    highlightButton.classList.toggle('active');
+    const highlightBtn = document.getElementById('highlight-btn');
+    const pdfContainer = document.querySelector('.pdf-container');
     
     if (isHighlightMode) {
-        // Change cursor to indicate highlight mode
-        pdfContainer.style.cursor = 'text';
-        showNotification('Highlight mode activated. Select text to highlight.', 'info');
+        // Enable highlight mode
+        highlightBtn.classList.add('highlight-active');
+        pdfContainer.classList.add('highlight-mode');
+        document.body.style.cursor = 'text';
+        showNotification('Highlight mode enabled. Select text to highlight.', 'info');
+        
+        // Make text layer more visible in highlight mode
+        document.querySelectorAll('.textLayer').forEach(layer => {
+            layer.style.opacity = '0.2';
+        });
     } else {
-        // Reset cursor
-        pdfContainer.style.cursor = 'default';
-        showNotification('Highlight mode deactivated.', 'info');
+        // Disable highlight mode
+        highlightBtn.classList.remove('highlight-active');
+        pdfContainer.classList.remove('highlight-mode');
+        document.body.style.cursor = 'default';
+        showNotification('Highlight mode disabled', 'info');
+        
+        // Reset text layer opacity
+        document.querySelectorAll('.textLayer').forEach(layer => {
+            layer.style.opacity = '0.2';
+        });
     }
 }
 
-// Apply highlights to the current page
-function applyHighlights() {
-    // In a real app, you'd apply stored highlights to the current page
-    // For this demo, we'll just log the highlights for the current page
-    const pageHighlights = highlights.filter(h => h.page === pageNum);
-    if (pageHighlights.length > 0) {
-        console.log(`Highlights on page ${pageNum}:`, pageHighlights);
+// Clear highlights
+function clearHighlights() {
+    if (highlights.length === 0) {
+        showNotification('No highlights to clear', 'info');
+        return;
     }
+    
+    // Remove all highlight elements
+    highlights.forEach(highlight => {
+        if (highlight.element && highlight.element.parentNode) {
+            const text = highlight.element.textContent;
+            const textNode = document.createTextNode(text);
+            highlight.element.parentNode.replaceChild(textNode, highlight.element);
+        }
+    });
+    
+    // Clear highlights array
+    highlights = [];
+    showNotification('All highlights have been cleared', 'success');
 }
 
-// Download PDF
-function downloadPdf() {
+// Download PDF with highlights
+async function downloadPdf() {
     if (!pdfData) {
         showNotification('PDF data not available for download.', 'error');
         return;
     }
     
-    // Add download animation
-    downloadButton.classList.add('downloading');
-    
-    setTimeout(() => {
-        const fileName = pdfTitle.textContent || 'document.pdf';
-        const blob = new Blob([Uint8Array.from(atob(pdfData), c => c.charCodeAt(0))], { type: 'application/pdf' });
+    try {
+        // Add download animation
+        downloadButton.classList.add('downloading');
+        
+        // Load PDF document for modification
+        const pdfBytes = Uint8Array.from(atob(pdfData), c => c.charCodeAt(0));
+        const pdfDoc = await pdfjsLib.getDocument({ data: pdfBytes }).promise;
+        
+        // Create a new PDF document
+        const PDFLib = await import('https://unpkg.com/pdf-lib@1.17.1?module');
+        const modifiedPdfDoc = await PDFLib.PDFDocument.load(pdfBytes);
+        
+        // Apply highlights to each page
+        for (const highlight of highlights) {
+            const page = modifiedPdfDoc.getPage(highlight.pageNumber - 1);
+            
+            // Create highlight annotation
+            page.drawRectangle({
+                x: highlight.position.left,
+                y: page.getHeight() - (highlight.position.top + highlight.position.height),
+                width: highlight.position.width,
+                height: highlight.position.height,
+                color: PDFLib.rgb(1, 0.898, 0.212), // #ffe536 in RGB
+                opacity: 0.4
+            });
+        }
+        
+        // Save the modified PDF
+        const modifiedPdfBytes = await modifiedPdfDoc.save();
+        
+        // Create download link
+        const blob = new Blob([modifiedPdfBytes], { type: 'application/pdf' });
         const url = URL.createObjectURL(blob);
+        const fileName = pdfTitle.textContent || 'document.pdf';
         
         const a = document.createElement('a');
         a.href = url;
@@ -776,8 +922,12 @@ function downloadPdf() {
         downloadButton.classList.remove('downloading');
         
         // Show success notification
-        showNotification(`PDF "${fileName}" downloaded successfully!`, 'info');
-    }, 500);
+        showNotification(`PDF "${fileName}" downloaded successfully with highlights!`, 'success');
+    } catch (error) {
+        console.error('Error downloading PDF:', error);
+        downloadButton.classList.remove('downloading');
+        showNotification('Error downloading PDF with highlights. Please try again.', 'error');
+    }
 }
 
 // Share chat functionality
@@ -878,28 +1028,27 @@ function sendMessage() {
     // Add user message to chat
     addMessageToChat(message, 'user');
     
-    // Add to chat history
-    chatHistory.push({
-        sender: 'user',
-        message: message,
-        timestamp: new Date().toISOString()
-    });
-    
-    // Clear input and reset height
+    // Clear input
     chatInput.value = '';
     chatInput.style.height = 'auto';
     
-    // Simulate AI response (in a real app, you'd call an API)
+    // Simulate AI response
     simulateAiResponse(message);
 }
 
 // Add a message to the chat
-function addMessageToChat(message, sender) {
-    const messageDiv = document.createElement('div');
-    messageDiv.className = `message ${sender}-message`;
+function addMessageToChat(message, sender, messageType = '') {
+    const messageElement = document.createElement('div');
     
-    const contentDiv = document.createElement('div');
-    contentDiv.className = 'message-content';
+    // Set appropriate message class based on sender and messageType
+    if (messageType) {
+        messageElement.className = `message ${messageType}-message`;
+    } else {
+        messageElement.className = `message ${sender}-message`;
+    }
+    
+    const contentElement = document.createElement('div');
+    contentElement.className = 'message-content';
     
     // Handle multi-line messages
     const paragraphs = message.split('\n');
@@ -907,102 +1056,235 @@ function addMessageToChat(message, sender) {
         if (paragraph.trim()) {
             const p = document.createElement('p');
             p.textContent = paragraph;
-            contentDiv.appendChild(p);
+            contentElement.appendChild(p);
         }
     });
     
-    messageDiv.appendChild(contentDiv);
-    
-    chatMessages.appendChild(messageDiv);
+    messageElement.appendChild(contentElement);
+    chatMessages.appendChild(messageElement);
     
     // Scroll to bottom
     chatMessages.scrollTop = chatMessages.scrollHeight;
+    
+    // Add to chat history
+    chatHistory.push({ 
+        sender, 
+        message,
+        messageType,
+        timestamp: new Date().toISOString() 
+    });
 }
 
 // Simulate AI response
 function simulateAiResponse(userMessage) {
-    // Show typing indicator
-    const typingDiv = document.createElement('div');
-    typingDiv.className = 'message ai-message typing';
-    typingDiv.innerHTML = `
-        <div class="message-content">
-            <div class="typing-indicator">
-                <div class="typing-dot"></div>
-                <div class="typing-dot"></div>
-                <div class="typing-dot"></div>
-            </div>
-        </div>
+    // Add typing indicator
+    const typingIndicator = document.createElement('div');
+    typingIndicator.className = 'message ai-message typing-indicator';
+    typingIndicator.innerHTML = `
+        <div class="typing-dot"></div>
+        <div class="typing-dot"></div>
+        <div class="typing-dot"></div>
     `;
-    
-    chatMessages.appendChild(typingDiv);
+    chatMessages.appendChild(typingIndicator);
     chatMessages.scrollTop = chatMessages.scrollHeight;
     
-    // Simulate delay
+    // Simulate typing delay
     setTimeout(() => {
         // Remove typing indicator
-        chatMessages.removeChild(typingDiv);
+        if (typingIndicator.parentNode) {
+            typingIndicator.parentNode.removeChild(typingIndicator);
+        }
+        
+        let response = '';
+        let messageType = 'ai';
         
         // Generate response based on user message
-        let response;
-        
-        if (userMessage.toLowerCase().includes('summary') || userMessage.toLowerCase().includes('summarize')) {
-            response = "Here's a summary of the document:\n\nThis document discusses key concepts related to the topic. It covers several important points including background information, methodology, results, and conclusions. The main findings suggest that there is a significant relationship between the variables studied.";
-        } else if (userMessage.toLowerCase().includes('page')) {
-            response = `I can see you're currently on page ${pageNum} of ${pdfDoc.numPages}. This page contains information about the topic discussed in the document.`;
-        } else if (userMessage.toLowerCase().includes('author') || userMessage.toLowerCase().includes('who wrote')) {
-            response = "The author information is not explicitly mentioned in the document. However, based on the content, it appears to be written by an expert in the field.";
-        } else if (userMessage.toLowerCase().includes('date') || userMessage.toLowerCase().includes('when')) {
-            response = "The document doesn't explicitly mention a publication date, but based on the references cited, it appears to be relatively recent.";
-        } else if (userMessage.toLowerCase().includes('highlight') || userMessage.toLowerCase().includes('select')) {
-            response = "To highlight text in the document, click the highlight button in the toolbar (or press Ctrl+H), then select the text you want to highlight. Click the highlight button again to exit highlight mode.";
-        } else if (userMessage.toLowerCase().includes('download') || userMessage.toLowerCase().includes('save')) {
-            response = "You can download the PDF by clicking the download button in the toolbar (or press Ctrl+D). The file will be saved with its original name.";
+        if (userMessage.toLowerCase().includes('hello') || userMessage.toLowerCase().includes('hi')) {
+            response = "Hello! I'm your PDF assistant. How can I help you with this document today?";
+        } else if (userMessage.toLowerCase().includes('help')) {
+            response = "I can help you understand the content of your PDF. You can ask me questions about specific pages, search for information, or request summaries of sections.";
+        } else if (userMessage.toLowerCase().includes('thank')) {
+            response = "You're welcome! If you have any more questions about the PDF, feel free to ask.";
+            messageType = 'success';
+        } else if (userMessage.toLowerCase().includes('error') || userMessage.toLowerCase().includes('problem') || userMessage.toLowerCase().includes('issue')) {
+            response = "I notice you're mentioning an issue. If you're having problems with the PDF display, try using the zoom controls or navigating to a different page. If problems persist, please refresh the page.";
+            messageType = 'warning';
+        } else if (userMessage.toLowerCase().includes('not working') || userMessage.toLowerCase().includes('broken')) {
+            response = "I'm sorry to hear something isn't working properly. Could you provide more details about the problem so I can try to help you resolve it?";
+            messageType = 'error';
         } else if (userMessage.toLowerCase().includes('zoom')) {
-            response = "You can zoom in and out using the zoom controls in the toolbar. You can also use keyboard shortcuts: Ctrl+ to zoom in, Ctrl- to zoom out, and Ctrl+0 to reset zoom.";
+            response = "You can use the zoom controls in the toolbar above the PDF. Click the + button to zoom in, the - button to zoom out, or the reset button to return to the default zoom level.";
+        } else if (userMessage.toLowerCase().includes('navigate') || userMessage.toLowerCase().includes('page')) {
+            response = "To navigate between pages, use the previous and next buttons in the toolbar. You can also see your current page number and the total number of pages displayed in the center.";
         } else if (userMessage.toLowerCase().includes('search')) {
-            response = "To search for text in the document, use the search box in the toolbar. Type your search term and press Enter or click the search button.";
+            response = "You can search for text in the PDF using the search box in the toolbar. Type your search term and press Enter or click the search icon to find matches within the document.";
+        } else if (userMessage.toLowerCase().includes('highlight')) {
+            response = "To highlight text, click the highlight button in the toolbar, then select the text you want to highlight in the PDF. Click the highlight button again to exit highlight mode.";
+        } else if (userMessage.toLowerCase().includes('download')) {
+            response = "You can download the PDF by clicking the download button in the toolbar. This will save the current PDF to your device.";
         } else if (userMessage.toLowerCase().includes('share') || userMessage.toLowerCase().includes('export')) {
             response = "You can share or export this chat using the buttons at the top of the chat panel. The share button allows you to share the conversation, while the export button lets you download the chat as a text file.";
-        } else if (userMessage.toLowerCase().includes('clear') || userMessage.toLowerCase().includes('delete')) {
+            messageType = 'system';
+        } else if (userMessage.toLowerCase().includes('clear') || userMessage.includes('delete')) {
             response = "You can clear the chat history by clicking the trash icon at the top of the chat panel. This will remove all messages and start a new conversation.";
+            messageType = 'system';
         } else {
             response = "I've analyzed the document and found relevant information related to your question. The document discusses this topic in detail, particularly on pages 2-3 where key concepts are explained. Would you like me to elaborate on any specific aspect?";
         }
         
         // Add AI response to chat
-        addMessageToChat(response, 'ai');
+        addMessageToChat(response, 'ai', messageType);
         
-        // Add to chat history
-        chatHistory.push({
-            sender: 'ai',
-            message: response,
-            timestamp: new Date().toISOString()
-        });
     }, 1500);
 }
 
 // Show notification
 function showNotification(message, type = 'info') {
-    if (!notification || !notificationMessage) return;
+    // Don't show notifications with empty messages
+    if (!message || message.trim() === '') {
+        console.warn("Attempted to show notification with empty message");
+        return;
+    }
+    
+    const notification = document.getElementById('notification');
+    const notificationMessage = document.getElementById('notification-message');
+    
+    if (!notification || !notificationMessage) {
+        console.error("Notification elements not found");
+        return;
+    }
+    
+    // Set the notification icon based on type
+    const notificationIcon = notification.querySelector('.notification-icon');
+    if (notificationIcon) {
+        // Update icon path based on notification type
+        switch(type) {
+            case 'error':
+                notificationIcon.innerHTML = `
+                    <path fill="none" d="M0 0h24v24H0z" />
+                    <path fill="currentColor" d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z" />
+                `;
+                break;
+            case 'warning':
+                notificationIcon.innerHTML = `
+                    <path fill="none" d="M0 0h24v24H0z" />
+                    <path fill="currentColor" d="M1 21h22L12 2 1 21zm12-3h-2v-2h2v2zm0-4h-2v-4h2v4z" />
+                `;
+                break;
+            case 'success':
+                notificationIcon.innerHTML = `
+                    <path fill="none" d="M0 0h24v24H0z" />
+                    <path fill="currentColor" d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z" />
+                `;
+                break;
+            default:
+                notificationIcon.innerHTML = `
+                    <path fill="none" d="M0 0h24v24H0z" />
+                    <path fill="currentColor" d="M12 22C6.477 22 2 17.523 2 12S6.477 2 12 2s10 4.477 10 10-4.477 10-10 10zm0-2a8 8 0 1 0 0-16 8 8 0 0 0 0 16zm-1-5h2v2h-2v-2zm0-8h2v6h-2V7z" />
+                `;
+        }
+    }
+    
+    // Set the message text content
+    notificationMessage.textContent = message;
     
     // Remove existing classes
-    notification.classList.remove('error', 'warning', 'info');
+    notification.classList.remove('error', 'info', 'success', 'warning');
     
     // Add appropriate class
     notification.classList.add(type);
     
-    // Set message
-    notificationMessage.textContent = message;
-    
     // Show notification
     notification.classList.add('show');
     
-    // Auto-hide after 4 seconds
+    // Auto hide after 5 seconds
     setTimeout(() => {
-        notification.classList.add('fade-out');
-        setTimeout(() => {
-            notification.classList.remove('show');
-            notification.classList.remove('fade-out');
-        }, 500);
-    }, 4000);
+        notification.classList.remove('show');
+    }, 5000);
+}
+
+// Add search navigation functions
+function showSearchControls(totalResults) {
+    const searchDiv = document.querySelector('.pdf-search');
+    
+    // Create or update search controls
+    let controls = document.querySelector('.search-controls');
+    if (!controls) {
+        controls = document.createElement('div');
+        controls.className = 'search-controls';
+        controls.innerHTML = `
+            <span class="search-count">0 of ${totalResults}</span>
+            <button class="search-nav-btn" id="prev-result" title="Previous result">
+                <svg width="16" height="16" viewBox="0 0 24 24">
+                    <path fill="currentColor" d="M15.41 7.41L14 6l-6 6 6 6 1.41-1.41L10.83 12z"/>
+                </svg>
+            </button>
+            <button class="search-nav-btn" id="next-result" title="Next result">
+                <svg width="16" height="16" viewBox="0 0 24 24">
+                    <path fill="currentColor" d="M10 6L8.59 7.41 13.17 12l-4.58 4.59L10 18l6-6z"/>
+                </svg>
+            </button>
+        `;
+        searchDiv.appendChild(controls);
+        
+        // Add event listeners
+        document.getElementById('prev-result').addEventListener('click', () => navigateToSearchResult(currentSearchIndex - 1));
+        document.getElementById('next-result').addEventListener('click', () => navigateToSearchResult(currentSearchIndex + 1));
+    }
+    
+    controls.classList.add('visible');
+}
+
+function hideSearchControls() {
+    const controls = document.querySelector('.search-controls');
+    if (controls) {
+        controls.classList.remove('visible');
+    }
+}
+
+function navigateToSearchResult(index) {
+    if (searchResults.length === 0) return;
+    
+    // Remove current highlight class
+    if (currentSearchIndex !== -1 && searchResults[currentSearchIndex].element) {
+        searchResults[currentSearchIndex].element.classList.remove('current');
+    }
+    
+    // Update index with wrapping
+    currentSearchIndex = (index + searchResults.length) % searchResults.length;
+    
+    const result = searchResults[currentSearchIndex];
+    
+    // Scroll to the page containing the result
+    scrollToPage(result.pageNumber);
+    
+    // Update search count display
+    const searchCount = document.querySelector('.search-count');
+    if (searchCount) {
+        searchCount.textContent = `${currentSearchIndex + 1} of ${searchResults.length}`;
+    }
+    
+    // Update navigation buttons
+    updateSearchNavButtons();
+    
+    // Highlight current result
+    setTimeout(() => {
+        if (result.element) {
+            result.element.classList.add('current');
+            result.element.scrollIntoView({
+                behavior: 'smooth',
+                block: 'center'
+            });
+        }
+    }, 100);
+}
+
+function updateSearchNavButtons() {
+    const prevButton = document.getElementById('prev-result');
+    const nextButton = document.getElementById('next-result');
+    
+    if (prevButton && nextButton) {
+        prevButton.disabled = searchResults.length <= 1;
+        nextButton.disabled = searchResults.length <= 1;
+    }
 } 

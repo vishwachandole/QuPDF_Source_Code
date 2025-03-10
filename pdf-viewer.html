@@ -13,6 +13,21 @@
     <script>
         // Set worker source path for PDF.js
         pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.worker.min.js';
+        
+        // Check if PDF.js is loaded properly
+        if (typeof pdfjsLib === 'undefined') {
+            console.error('PDF.js library failed to load');
+            // Try to load from alternative CDN
+            const script = document.createElement('script');
+            script.src = 'https://mozilla.github.io/pdf.js/build/pdf.min.js';
+            script.onload = function() {
+                pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://mozilla.github.io/pdf.js/build/pdf.worker.min.js';
+                console.log('PDF.js loaded from alternative source');
+            };
+            document.head.appendChild(script);
+        } else {
+            console.log('PDF.js loaded successfully');
+        }
     </script>
 </head>
 
@@ -21,11 +36,8 @@
     <div id="notification" class="notification">
         <div class="notification-content">
             <div class="notification-icon-message">
-                <svg class="notification-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="24" height="24">
-                    <path fill="none" d="M0 0h24v24H0z" />
-                    <path fill="currentColor" d="M12 22C6.477 22 2 17.523 2 12S6.477 2 12 2s10 4.477 10 10-4.477 10-10 10zm0-2a8 8 0 1 0 0-16 8 8 0 0 0 0 16zm-1-5h2v2h-2v-2zm0-8h2v6h-2V7z" />
-                </svg>
-                <span id="notification-message">Error message goes here</span>
+                <svg class="notification-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="24" height="24"></svg>
+                <span id="notification-message"></span>
             </div>
             <button id="notification-close" class="notification-close">&times;</button>
         </div>
@@ -116,14 +128,11 @@
             </div>
         </div>
 
-        <!-- Resizer -->
-        <div class="resizer" id="resizer"></div>
-
         <!-- Chat Interface Section -->
         <div class="chat-section">
-            <div class="chat-header">
+            <div class="chat-toolbar">
                 <h2>Chat</h2>
-                <div class="chat-actions">
+                <div class="chat-toolbar-actions">
                     <button id="share-chat" class="chat-action-btn" data-tooltip="Share Chat">
                         <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="24" height="24">
                             <path fill="none" d="M0 0h24v24H0z"/>
